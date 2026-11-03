@@ -1,0 +1,2581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>成绩本 · Gradebook</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230e7a5b'/%3E%3Cpath d='M18 44V33M32 44V20M46 44V27' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  @property --p {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 0;
+  }
+
+  :root {
+    --bg: #f3f1ea;
+    --surface: #fffdf8;
+    --surface-2: #f8f6f0;
+    --ink: #17211b;
+    --muted: #6d776f;
+    --faint: #9aa39c;
+    --line: #e5e0d5;
+    --line-strong: #d7d0c1;
+    --accent: #0e7a5b;
+    --accent-deep: #0a5c45;
+    --accent-soft: #e2f1e9;
+    --danger: #b4422f;
+    --danger-soft: #f8e7e2;
+    --amber: #a56b12;
+    --amber-soft: #fbf2df;
+    --shadow-sm: 0 1px 2px rgba(23, 33, 27, .04), 0 6px 18px rgba(23, 33, 27, .04);
+    --shadow-md: 0 2px 4px rgba(23, 33, 27, .04), 0 18px 44px rgba(23, 33, 27, .07);
+    --radius-lg: 26px;
+    --radius-md: 20px;
+    --radius-sm: 13px;
+    --font: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --num: "Bahnschrift", "DIN Alternate", "Segoe UI", var(--font);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(1000px 560px at 4% -12%, #e6f0e5 0%, rgba(230, 240, 229, 0) 62%),
+      radial-gradient(840px 540px at 102% -4%, #f5e7d5 0%, rgba(245, 231, 213, 0) 58%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  svg { display: block; }
+  [hidden] { display: none !important; }
+
+  .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+  .icon {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: none;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 284px minmax(0, 1fr);
+    max-width: 1560px;
+    min-height: 100vh;
+    margin: 0 auto;
+  }
+
+  /* ---------------- sidebar ---------------- */
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 20px 22px;
+    border-right: 1px solid rgba(23, 33, 27, .07);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 8px;
+    margin-bottom: 38px;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #eafff5;
+    background: linear-gradient(145deg, #128565, #0a4f3c);
+    box-shadow: 0 8px 18px rgba(10, 79, 60, .22), inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+
+  .brand-mark svg { width: 22px; height: 22px; }
+
+  .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .brand-sub {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .19em;
+    color: var(--faint);
+    margin-top: 3px;
+  }
+
+  .side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: var(--faint);
+    text-transform: uppercase;
+  }
+
+  .course-list {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 2px 4px 12px;
+    margin: 0 -4px;
+  }
+
+  .course-list::-webkit-scrollbar { width: 6px; }
+  .course-list::-webkit-scrollbar-thumb { background: #d8d3c7; border-radius: 99px; }
+
+  .course-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid transparent;
+    border-radius: 15px;
+    background: transparent;
+    text-align: left;
+    transition: background .16s ease, border-color .16s ease, transform .16s ease;
+  }
+
+  .course-item:hover { background: rgba(255, 253, 248, .7); border-color: rgba(23, 33, 27, .06); }
+
+  .course-item.active {
+    background: var(--surface);
+    border-color: var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .course-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--tone, var(--accent));
+    background: color-mix(in srgb, var(--tone, var(--accent)) 11%, white);
+    flex: none;
+  }
+
+  .course-info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .course-name {
+    font-size: 13.5px;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .course-sub {
+    font-size: 10.5px;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .course-score {
+    font-family: var(--num);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+  .course-item.active .course-score { color: var(--accent); }
+
+  .new-course {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 11px;
+    margin-top: 10px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 13px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: all .16s ease;
+  }
+  .new-course:hover { border-color: var(--accent); color: var(--accent); background: rgba(255, 253, 248, .7); }
+
+  .side-foot {
+    margin-top: auto;
+    padding: 14px 12px 4px;
+    border-top: 1px solid rgba(23, 33, 27, .07);
+  }
+
+  .local-note { display: flex; gap: 9px; align-items: flex-start; color: var(--faint); }
+  .local-note .icon { width: 15px; height: 15px; margin-top: 1px; color: #8d988f; }
+  .local-note b { display: block; font-size: 10.5px; font-weight: 650; color: var(--muted); margin-bottom: 2px; }
+  .local-note span { font-size: 10px; line-height: 1.5; display: block; }
+
+  .backup-link {
+    margin: 9px 0 0 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font-size: 10px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color .15s ease;
+  }
+  .backup-link:hover { color: var(--accent); }
+
+  /* ---------------- main ---------------- */
+
+  .main {
+    min-width: 0;
+    padding: 30px 38px 42px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    margin-bottom: 24px;
+  }
+
+  .course-head { min-width: 0; flex: 1; }
+
+  .eyebrow {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    color: var(--faint);
+    text-transform: uppercase;
+    margin: 0 0 2px 2px;
+  }
+
+  .course-title {
+    width: 100%;
+    max-width: 640px;
+    margin: 0;
+    padding: 2px 2px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -.035em;
+    line-height: 1.25;
+    transition: border-color .16s ease;
+  }
+  .course-title:hover { border-bottom-color: var(--line); }
+  .course-title:focus { outline: none; border-bottom-color: var(--accent); }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+  .save-state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+    font-size: 11px;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .save-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #48a982;
+    box-shadow: 0 0 0 3px rgba(72, 169, 130, .12);
+    transition: background .2s ease, box-shadow .2s ease;
+  }
+  .save-state[data-state="saving"] .save-dot { background: #d19b3c; box-shadow: 0 0 0 3px rgba(209, 155, 60, .14); }
+  .save-state[data-state="error"] .save-dot { background: #c35b45; box-shadow: 0 0 0 3px rgba(195, 91, 69, .14); }
+  .save-state[data-state="error"] { color: var(--danger); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 38px;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: rgba(255, 253, 248, .62);
+    font-size: 12.5px;
+    font-weight: 650;
+    transition: all .16s ease;
+  }
+  .btn:hover { background: var(--surface); border-color: var(--line-strong); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn .icon { width: 15px; height: 15px; }
+
+  .btn-primary {
+    height: 44px;
+    padding: 0 20px;
+    border-color: var(--ink);
+    background: var(--ink);
+    color: #fff;
+    font-size: 13.5px;
+    box-shadow: 0 8px 20px rgba(23, 33, 27, .16);
+  }
+  .btn-primary:hover { background: #0c1711; border-color: #0c1711; }
+
+  .btn-accent {
+    height: 40px;
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(14, 122, 91, .16);
+  }
+  .btn-accent:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+
+  .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #9b3525; border-color: #9b3525; }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--faint);
+    transition: all .16s ease;
+  }
+  .icon-btn:hover { color: var(--danger); background: var(--danger-soft); border-color: #efd6cf; }
+  .icon-btn .icon { width: 17px; height: 17px; }
+
+  /* ---------------- hero ---------------- */
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    align-items: center;
+    gap: 36px;
+    row-gap: 24px;
+    padding: 30px 34px;
+    border-radius: var(--radius-lg);
+    color: #f4fff9;
+    background:
+      radial-gradient(620px 300px at 88% -30%, rgba(126, 221, 174, .28), transparent 68%),
+      linear-gradient(138deg, #0f2119 0%, #14372a 58%, #174735 100%);
+    box-shadow: 0 24px 54px rgba(15, 33, 25, .18), inset 0 1px 0 rgba(255, 255, 255, .07);
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    right: -160px;
+    bottom: -290px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 50%;
+    box-shadow: 0 0 0 54px rgba(255, 255, 255, .025), 0 0 0 108px rgba(255, 255, 255, .018);
+    pointer-events: none;
+  }
+
+  .score-ring {
+    --p: 0;
+    --ring: #8fe3bb;
+    position: relative;
+    width: 182px;
+    height: 182px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(var(--ring) calc(var(--p) * 1%), rgba(255, 255, 255, .11) 0);
+    transition: --p .65s cubic-bezier(.2, .75, .25, 1);
+    flex: none;
+    z-index: 1;
+  }
+
+  .score-ring::before {
+    content: "";
+    position: absolute;
+    inset: 11px;
+    border-radius: 50%;
+    background: #10281e;
+    box-shadow: inset 0 0 42px rgba(0, 0, 0, .32), 0 1px 0 rgba(255, 255, 255, .06);
+  }
+
+  .score-ring::after {
+    content: "";
+    position: absolute;
+    inset: 11px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 22%, rgba(255, 255, 255, .08), transparent 54%);
+    pointer-events: none;
+  }
+
+  .score-ring[data-tone="good"] { --ring: #9fd1f2; }
+  .score-ring[data-tone="mid"] { --ring: #f1d38c; }
+  .score-ring[data-tone="pass"] { --ring: #f0b48c; }
+  .score-ring[data-tone="fail"] { --ring: #ec9a8e; }
+  .score-ring[data-tone="none"] { --ring: #647a6e; }
+
+  .ring-inner { position: relative; z-index: 2; text-align: center; padding-top: 3px; }
+
+  .ring-inner strong {
+    display: block;
+    font-family: var(--num);
+    font-size: 49px;
+    font-weight: 700;
+    letter-spacing: -.045em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+  }
+
+  .ring-inner span {
+    display: block;
+    margin-top: 9px;
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: .12em;
+    color: rgba(236, 255, 246, .55);
+    text-transform: uppercase;
+  }
+
+  .ring-target {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    border-radius: 50%;
+    pointer-events: none;
+    transform: rotate(calc(var(--target, 0) * 3.6deg));
+  }
+
+  .ring-target.show { display: block; }
+
+  .ring-target::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 4px;
+    height: 15px;
+    margin-left: -2px;
+    border-radius: 99px;
+    background: #ffd181;
+    box-shadow: 0 0 0 2px rgba(16, 40, 30, .48), 0 0 10px rgba(255, 209, 129, .5);
+  }
+
+  .hero-copy { position: relative; z-index: 1; min-width: 0; }
+
+  .hero-topline { display: flex; align-items: center; gap: 12px; margin-bottom: 9px; }
+
+  .hero-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .17em;
+    color: rgba(210, 240, 224, .55);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .hero-label span { color: rgba(236, 255, 246, .86); letter-spacing: .02em; }
+
+  .grade-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 99px;
+    background: #a9edc9;
+    color: #0b2a1d;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+  .grade-badge[data-tone="good"] { background: #b9ddf6; }
+  .grade-badge[data-tone="mid"] { background: #f5dda1; }
+  .grade-badge[data-tone="pass"] { background: #f5c5a1; }
+  .grade-badge[data-tone="fail"] { background: #f2b0a6; }
+  .grade-badge[data-tone="none"] { background: rgba(255, 255, 255, .13); color: rgba(244, 255, 249, .7); }
+
+  .hero h2 {
+    margin: 0 0 8px;
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -.025em;
+    line-height: 1.3;
+  }
+
+  .hero-hint {
+    margin: 0;
+    max-width: 540px;
+    font-size: 12px;
+    line-height: 1.65;
+    color: rgba(226, 246, 236, .58);
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 38px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, .11);
+  }
+
+  .hero-stat b {
+    display: block;
+    max-width: 190px;
+    font-family: var(--num);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #f6fffb;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-stat span {
+    display: block;
+    margin-top: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: rgba(215, 242, 229, .44);
+    text-transform: uppercase;
+  }
+
+  .hero-goal {
+    grid-column: 1 / -1;
+    position: relative;
+    z-index: 1;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, .11);
+    text-align: left;
+  }
+
+  .goal-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .goal-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    color: rgba(210, 240, 224, .5);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .goal-value {
+    font-family: var(--num);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: #ffd181;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .goal-value.unset {
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: rgba(244, 255, 249, .68);
+  }
+
+  .goal-status {
+    flex: 1;
+    min-width: 120px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: rgba(226, 246, 236, .58);
+  }
+
+  .hero-goal.achieved .goal-status { color: #a9edc9; }
+  .hero-goal.achieved .goal-value { color: #a9edc9; }
+
+  .goal-btn {
+    flex: none;
+    height: 28px;
+    padding: 0 11px;
+    border: 1px solid rgba(255, 255, 255, .17);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .06);
+    color: rgba(244, 255, 249, .82);
+    font-size: 10.5px;
+    font-weight: 650;
+    white-space: nowrap;
+    transition: all .16s ease;
+  }
+  .goal-btn:hover { background: rgba(255, 255, 255, .13); border-color: rgba(255, 255, 255, .26); }
+
+  .goal-track {
+    position: relative;
+    height: 5px;
+    margin-top: 10px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, .12);
+  }
+
+  .goal-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #8fe3bb, #f3cd7c);
+    transition: width .45s cubic-bezier(.2, .75, .25, 1);
+  }
+
+  .hero-goal.achieved .goal-fill {
+    background: linear-gradient(90deg, #8fe3bb, #c4f6dd);
+  }
+
+  .goal-mark {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 13px;
+    border-radius: 2px;
+    background: #ffd181;
+    transform: translateX(-1px);
+    box-shadow: 0 0 8px rgba(255, 209, 129, .45);
+  }
+
+  /* ---------------- warning ---------------- */
+
+  .weight-warning {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 15px;
+    border: 1px solid #ecd9b2;
+    border-radius: 13px;
+    background: var(--amber-soft);
+    color: #7c5a17;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .weight-warning.show { display: flex; }
+  .weight-warning .icon { width: 16px; height: 16px; flex: none; }
+  .weight-warning b { font-weight: 700; }
+
+  /* ---------------- components ---------------- */
+
+  .components-section { margin-top: 34px; }
+
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .section-title-row { display: flex; align-items: baseline; gap: 10px; }
+  .section-head h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.025em; }
+  .section-count {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--faint);
+    padding: 3px 8px;
+    border-radius: 99px;
+    background: rgba(23, 33, 27, .05);
+  }
+
+  .component-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(390px, 1fr));
+    gap: 16px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .component-card {
+    position: relative;
+    min-width: 0;
+    padding: 20px 20px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s ease, border-color .2s ease;
+    animation: card-in .32s cubic-bezier(.2, .7, .3, 1) both;
+  }
+  .component-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(7px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .comp-top { display: flex; align-items: center; gap: 10px; }
+
+  .comp-index {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--tone) 11%, white);
+    color: var(--tone);
+    font-family: var(--num);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    flex: none;
+  }
+
+  .comp-name {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 0;
+    border: 0;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    transition: border-color .16s ease;
+  }
+  .comp-name:hover { border-bottom-color: var(--line); }
+  .comp-name:focus { outline: none; border-bottom-color: var(--tone); }
+
+  .weight-field {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    height: 34px;
+    padding: 0 9px 0 2px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    flex: none;
+    transition: border-color .16s ease, background .16s ease;
+  }
+  .weight-field:focus-within { border-color: var(--tone); background: #fff; }
+  .weight-field input {
+    width: 43px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    text-align: right;
+    font-family: var(--num);
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .weight-field input::-webkit-outer-spin-button,
+  .weight-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .weight-field input:focus { outline: none; }
+  .weight-field span { font-size: 11px; font-weight: 650; color: var(--faint); }
+
+  .comp-del {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #b3bab4;
+    flex: none;
+    transition: all .15s ease;
+  }
+  .comp-del:hover { color: var(--danger); background: var(--danger-soft); }
+  .comp-del .icon { width: 15px; height: 15px; }
+
+  .comp-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 2px 40px;
+    font-size: 11px;
+    color: #8b958d;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .comp-stats b {
+    font-family: var(--num);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .comp-stats .sep { color: #d7d2c7; }
+  .comp-stats .contrib b { color: var(--tone); }
+
+  .items { margin-top: 8px; }
+
+  .item-row {
+    padding: 10px 0 11px;
+    border-top: 1px dashed #ece8de;
+  }
+
+  .item-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+
+  .item-name {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    transition: color .15s ease;
+  }
+  .item-name:hover { color: var(--ink); }
+  .item-name:focus { outline: none; color: var(--ink); }
+
+  .score-num { display: flex; align-items: baseline; gap: 3px; flex: none; }
+  .score-num input {
+    width: 47px;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    text-align: right;
+    font-family: var(--num);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    appearance: textfield;
+    -moz-appearance: textfield;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .score-num input::-webkit-outer-spin-button,
+  .score-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .score-num input:focus { outline: none; border-color: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 12%, transparent); }
+  .score-num span { font-size: 10px; color: var(--faint); }
+
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin: 0;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--tone) var(--val, 0%), #ece8dd var(--val, 0%));
+    cursor: pointer;
+    outline: none;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 3px solid var(--tone);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 7px rgba(23, 33, 27, .18);
+    transition: transform .14s ease, box-shadow .14s ease;
+  }
+  .slider::-moz-range-thumb {
+    width: 13px;
+    height: 13px;
+    border: 3px solid var(--tone);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 7px rgba(23, 33, 27, .18);
+  }
+  .slider:hover::-webkit-slider-thumb { transform: scale(1.08); }
+  .slider:active::-webkit-slider-thumb { transform: scale(1.16); box-shadow: 0 2px 10px rgba(23, 33, 27, .24); }
+  .slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone) 18%, transparent); }
+
+  .no-items {
+    margin: 6px 0 4px;
+    padding: 15px 14px;
+    border: 1px dashed var(--line);
+    border-radius: 11px;
+    color: var(--faint);
+    font-size: 11.5px;
+    text-align: center;
+    line-height: 1.55;
+  }
+
+  .comp-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 13px;
+    padding-top: 13px;
+    border-top: 1px solid var(--line);
+  }
+
+  .count-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    background: var(--surface-2);
+  }
+
+  .count-control span {
+    margin: 0 5px 0 7px;
+    font-size: 10px;
+    font-weight: 650;
+    color: var(--faint);
+    letter-spacing: .04em;
+  }
+
+  .count-btn {
+    width: 23px;
+    height: 23px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    transition: all .14s ease;
+  }
+  .count-btn:hover { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(23, 33, 27, .09); }
+  .count-btn .icon { width: 13px; height: 13px; }
+
+  .count-value {
+    min-width: 16px;
+    text-align: center;
+    font-family: var(--num);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .text-btn {
+    padding: 4px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font-size: 10.5px;
+    font-weight: 600;
+    transition: color .15s ease;
+  }
+  .text-btn:hover { color: var(--danger); }
+
+  /* ---------------- empty ---------------- */
+
+  .empty-components {
+    grid-column: 1 / -1;
+    display: grid;
+    justify-items: center;
+    padding: 48px 26px 42px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+    background: rgba(255, 253, 248, .56);
+    text-align: center;
+  }
+
+  .empty-art { display: flex; align-items: flex-end; gap: 5px; height: 38px; margin-bottom: 16px; }
+  .empty-art span { width: 7px; border-radius: 4px; background: var(--accent); opacity: .25; }
+  .empty-art span:nth-child(1) { height: 16px; }
+  .empty-art span:nth-child(2) { height: 30px; opacity: .45; }
+  .empty-art span:nth-child(3) { height: 22px; opacity: .32; }
+  .empty-art span:nth-child(4) { height: 38px; opacity: .8; }
+
+  .empty-components h3 { margin: 0 0 7px; font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+  .empty-components p { max-width: 430px; margin: 0 0 20px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+
+  .preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 18px;
+    font-size: 10.5px;
+    color: var(--faint);
+  }
+  .preset-btn {
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    transition: all .15s ease;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .footnote {
+    margin: 26px 2px 0;
+    color: #a0a8a2;
+    font-size: 10.5px;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  /* ---------------- dialogs ---------------- */
+
+  dialog {
+    width: min(460px, calc(100vw - 32px));
+    padding: 0;
+    border: 0;
+    border-radius: 22px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 34px 90px rgba(10, 25, 18, .28);
+  }
+
+  dialog::backdrop { background: rgba(13, 28, 21, .42); backdrop-filter: blur(3px); }
+
+  dialog[open] { animation: dialog-in .2s cubic-bezier(.2, .75, .3, 1); }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .dialog-card { padding: 27px 27px 23px; }
+
+  .dialog-kicker {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .17em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .dialog-card h2 { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -.03em; }
+  .dialog-desc { margin: 0 0 20px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+
+  .field { display: block; margin-top: 15px; }
+  .field > span {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--muted);
+  }
+
+  .field input {
+    width: 100%;
+    height: 45px;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #fff;
+    font-size: 14px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .field input::placeholder { color: #b5bcb6; }
+  .field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(14, 122, 91, .09); }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+
+  .target-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 11px;
+  }
+
+  .target-preset {
+    height: 30px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 650;
+    transition: all .15s ease;
+  }
+  .target-preset:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
+
+  .target-clear {
+    margin-right: auto;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font-size: 10.5px;
+    font-weight: 600;
+    transition: color .15s ease;
+  }
+  .target-clear:hover { color: var(--danger); }
+
+  .dialog-sm { width: min(400px, calc(100vw - 32px)); }
+  .dialog-sm .dialog-card { padding: 26px 26px 22px; }
+
+  .warn-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 16px;
+    border-radius: 13px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .dialog-sm h2 { font-size: 19px; margin-bottom: 8px; }
+  .dialog-sm p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+
+  /* ---------------- toast ---------------- */
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 80;
+    max-width: calc(100vw - 40px);
+    padding: 11px 18px;
+    border-radius: 99px;
+    background: #13261d;
+    color: #f1fff8;
+    font-size: 12px;
+    font-weight: 550;
+    box-shadow: 0 14px 38px rgba(9, 24, 16, .28);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 14px);
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------------- responsive ---------------- */
+
+  @media (max-width: 1120px) {
+    .component-grid { grid-template-columns: 1fr; }
+    .main { padding: 28px 28px 40px; }
+    .hero { gap: 28px; padding: 28px; }
+    .hero-stats { gap: 28px; }
+  }
+
+  @media (max-width: 880px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      position: relative;
+      height: auto;
+      padding: 18px 18px 14px;
+      border-right: 0;
+      border-bottom: 1px solid rgba(23, 33, 27, .07);
+      background: rgba(243, 241, 234, .8);
+      backdrop-filter: blur(10px);
+    }
+    .brand { margin-bottom: 18px; padding: 0 2px; }
+    .brand-mark { width: 36px; height: 36px; border-radius: 12px; }
+    .brand-name { font-size: 16px; }
+    .side-head { padding: 0 2px; }
+    .course-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 8px; margin: 0 -2px; }
+    .course-item { min-width: 205px; width: auto; }
+    .new-course { margin-top: 0; }
+    .side-foot { display: none; }
+    .main { padding: 22px 18px 36px; }
+    .topbar { flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+    .course-title { font-size: 26px; }
+    .top-actions { width: 100%; justify-content: flex-start; }
+    .save-state { margin-right: auto; }
+  }
+
+  @media (max-width: 700px) {
+    .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 26px 22px 24px; gap: 22px; }
+    .score-ring { width: 156px; height: 156px; }
+    .ring-inner strong { font-size: 42px; }
+    .hero-topline { justify-content: center; }
+    .hero-hint { margin-left: auto; margin-right: auto; }
+    .hero-stats { justify-content: center; gap: 24px; width: 100%; }
+    .hero-stat b { font-size: 17px; max-width: 120px; }
+    .section-head { align-items: center; }
+    .section-head h2 { font-size: 18px; }
+    .btn-accent { padding: 0 12px; font-size: 12px; }
+    .component-grid { grid-template-columns: 1fr; }
+    .component-card { padding: 17px 16px 14px; }
+    .comp-stats { margin-left: 0; }
+    .top-actions .btn span { display: none; }
+    .top-actions .btn { width: 38px; padding: 0; }
+  }
+
+  @media (max-width: 700px) {
+    .hero-goal { padding-top: 13px; }
+    .goal-head { flex-wrap: wrap; gap: 7px 9px; }
+    .goal-status { flex-basis: calc(100% - 88px); min-width: 0; }
+    .goal-btn { margin-left: auto; }
+    .goal-track { margin-top: 9px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.1"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 19V10M12 19V5M19 19v-6"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg></div>
+      <div>
+        <div class="brand-name">成绩本</div>
+        <div class="brand-sub">GRADEBOOK</div>
+      </div>
+    </div>
+
+    <div class="side-head"><span>我的课程</span></div>
+    <nav id="courseList" class="course-list" aria-label="课程列表"></nav>
+    <button id="newCourseBtn" class="new-course" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+      新建课程
+    </button>
+
+    <div class="side-foot">
+      <div class="local-note">
+        <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>
+        <div>
+          <b>数据保存在这台电脑上</b>
+          <span>每次保存都会保留上一份自动备份。换设备前请用「导出」。</span>
+        </div>
+      </div>
+      <button id="restoreBackupBtn" class="backup-link" type="button">恢复上次自动备份</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="course-head">
+        <span class="eyebrow">CURRENT COURSE</span>
+        <input id="courseName" class="course-title" maxlength="40" aria-label="课程名称" spellcheck="false">
+      </div>
+      <div class="top-actions">
+        <div id="saveState" class="save-state" data-state="saved">
+          <span class="save-dot" aria-hidden="true"></span>
+          <span id="saveText">自动保存</span>
+        </div>
+        <button id="exportBtn" class="btn" type="button" title="导出备份">
+          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+          <span>导出</span>
+        </button>
+        <button id="importBtn" class="btn" type="button" title="导入备份">
+          <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+          <span>导入</span>
+        </button>
+        <button id="deleteCourseBtn" class="icon-btn" type="button" title="删除当前课程" aria-label="删除当前课程">
+          <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+        </button>
+        <input id="importFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </header>
+
+    <section class="hero" aria-label="课程总评">
+      <div id="scoreRing" class="score-ring" data-tone="none">
+        <div class="ring-inner">
+          <strong id="totalScore">0.0</strong>
+          <span>加权总分 / 100</span>
+        </div>
+        <span id="ringTarget" class="ring-target" aria-hidden="true"></span>
+      </div>
+      <div class="hero-copy">
+        <div class="hero-topline">
+          <span class="hero-label">当前课程 · <span id="heroCourseName">我的课程</span></span>
+          <span id="gradeBadge" class="grade-badge" data-tone="none">待录入</span>
+        </div>
+        <h2 id="heroTitle">每一次成绩，都算数。</h2>
+        <p id="heroHint" class="hero-hint">拖动下方滑块记录每次实验和 quiz，所有改动都会自动保存在本机。</p>
+        <div class="hero-stats">
+          <div class="hero-stat"><b id="statItems">0</b><span>记录项</span></div>
+          <div class="hero-stat"><b id="statWeight">0%</b><span>权重合计</span></div>
+          <div class="hero-stat"><b id="statTop">—</b><span>最高部分</span></div>
+        </div>
+      </div>
+      <div id="heroGoal" class="hero-goal">
+        <div class="goal-head">
+          <span class="goal-label">目标成绩</span>
+          <span id="goalValue" class="goal-value unset">未设定</span>
+          <span id="goalStatus" class="goal-status">设一个目标，看看离它还有多远。</span>
+          <button id="goalBtn" class="goal-btn" type="button">设定目标</button>
+        </div>
+        <div id="goalTrack" class="goal-track" hidden>
+          <span id="goalFill" class="goal-fill"></span>
+          <i id="goalMark" class="goal-mark"></i>
+        </div>
+      </div>
+    </section>
+
+    <div id="weightWarning" class="weight-warning" role="status">
+      <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+      <span id="weightWarningText"></span>
+    </div>
+
+    <section class="components-section" aria-labelledby="componentsTitle">
+      <div class="section-head">
+        <div class="section-title-row">
+          <h2 id="componentsTitle">课程组成</h2>
+          <span id="componentCount" class="section-count">0 部分</span>
+        </div>
+        <button id="addComponentBtn" class="btn btn-accent" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+          添加组成部分
+        </button>
+      </div>
+      <div id="componentList" class="component-grid"></div>
+    </section>
+
+    <p class="footnote">每次改动自动保存并保留上一份备份 · 数据只留在本机浏览器 · 建议定期导出备份</p>
+  </main>
+</div>
+
+<dialog id="courseDialog">
+  <form id="courseForm" class="dialog-card">
+    <span class="dialog-kicker">NEW COURSE</span>
+    <h2>新建一门课程</h2>
+    <p class="dialog-desc">先给课程起个名字。创建后，再添加实验、Quiz、期末考试等组成部分。</p>
+    <label class="field">
+      <span>课程名称</span>
+      <input id="newCourseName" type="text" maxlength="40" required placeholder="例如：生物化学实验" autocomplete="off">
+    </label>
+    <div class="dialog-actions">
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn btn-primary" type="submit">创建课程</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="componentDialog">
+  <form id="componentForm" class="dialog-card">
+    <span class="dialog-kicker">NEW COMPONENT</span>
+    <h2>添加组成部分</h2>
+    <p class="dialog-desc">同一部分里的每次成绩按平均分计算，再按权重计入总分。</p>
+    <label class="field">
+      <span>名称</span>
+      <input id="compName" type="text" maxlength="24" required placeholder="实验 / Quiz / 期末考试" autocomplete="off">
+    </label>
+    <div class="field-row">
+      <label class="field">
+        <span>占总成绩</span>
+        <input id="compWeight" type="number" min="0" max="100" step="1" required inputmode="numeric">
+      </label>
+      <label class="field">
+        <span>有几次</span>
+        <input id="compCount" type="number" min="0" max="40" step="1" required inputmode="numeric">
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn btn-primary" type="submit">添加</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="targetDialog">
+  <form id="targetForm" class="dialog-card">
+    <span class="dialog-kicker">GOAL SCORE</span>
+    <h2>设定目标成绩</h2>
+    <p class="dialog-desc">目标只用来追踪进度，不会改变成绩计算。及格线是 50 分。</p>
+    <label class="field">
+      <span>目标分数（0–100）</span>
+      <input id="targetScore" type="number" min="0" max="100" step="1" required inputmode="numeric" placeholder="例如：85">
+    </label>
+    <div class="target-presets" aria-label="快捷目标">
+      <button class="target-preset" type="button" data-target-preset="50">50 · 及格</button>
+      <button class="target-preset" type="button" data-target-preset="60">60</button>
+      <button class="target-preset" type="button" data-target-preset="75">75</button>
+      <button class="target-preset" type="button" data-target-preset="85">85</button>
+      <button class="target-preset" type="button" data-target-preset="90">90 · 优秀</button>
+    </div>
+    <div class="dialog-actions">
+      <button id="clearTargetBtn" class="target-clear" type="button">清除目标</button>
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn btn-primary" type="submit">保存目标</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmDialog" class="dialog-sm">
+  <div class="dialog-card">
+    <div class="warn-icon">!</div>
+    <h2 id="confirmTitle">确认操作</h2>
+    <p id="confirmMessage"></p>
+    <div class="dialog-actions">
+      <button id="confirmCancel" class="btn" type="button">取消</button>
+      <button id="confirmOk" class="btn btn-danger" type="button">确定</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'gradebook.v1';
+  const BACKUP_KEY = 'gradebook.v1.backup';
+  const MAX_ITEMS = 40;
+  const TONES = ['#0f7a5c', '#a56b12', '#b9583f', '#3f6fa8', '#7858a0', '#4f7d3d'];
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+
+  const els = {
+    courseList: $('#courseList'),
+    courseName: $('#courseName'),
+    heroCourseName: $('#heroCourseName'),
+    saveState: $('#saveState'),
+    saveText: $('#saveText'),
+    exportBtn: $('#exportBtn'),
+    importBtn: $('#importBtn'),
+    importFile: $('#importFile'),
+    deleteCourseBtn: $('#deleteCourseBtn'),
+    scoreRing: $('#scoreRing'),
+    totalScore: $('#totalScore'),
+    gradeBadge: $('#gradeBadge'),
+    heroTitle: $('#heroTitle'),
+    heroHint: $('#heroHint'),
+    statItems: $('#statItems'),
+    statWeight: $('#statWeight'),
+    statTop: $('#statTop'),
+    heroGoal: $('#heroGoal'),
+    goalValue: $('#goalValue'),
+    goalStatus: $('#goalStatus'),
+    goalBtn: $('#goalBtn'),
+    goalTrack: $('#goalTrack'),
+    goalFill: $('#goalFill'),
+    goalMark: $('#goalMark'),
+    ringTarget: $('#ringTarget'),
+    weightWarning: $('#weightWarning'),
+    weightWarningText: $('#weightWarningText'),
+    componentCount: $('#componentCount'),
+    componentList: $('#componentList'),
+    addComponentBtn: $('#addComponentBtn'),
+    newCourseBtn: $('#newCourseBtn'),
+    courseDialog: $('#courseDialog'),
+    courseForm: $('#courseForm'),
+    newCourseName: $('#newCourseName'),
+    componentDialog: $('#componentDialog'),
+    componentForm: $('#componentForm'),
+    compName: $('#compName'),
+    compWeight: $('#compWeight'),
+    compCount: $('#compCount'),
+    targetDialog: $('#targetDialog'),
+    targetForm: $('#targetForm'),
+    targetScore: $('#targetScore'),
+    clearTargetBtn: $('#clearTargetBtn'),
+    restoreBackupBtn: $('#restoreBackupBtn'),
+    confirmDialog: $('#confirmDialog'),
+    confirmTitle: $('#confirmTitle'),
+    confirmMessage: $('#confirmMessage'),
+    confirmCancel: $('#confirmCancel'),
+    confirmOk: $('#confirmOk'),
+    toast: $('#toast')
+  };
+
+  let state = null;
+  let saveTimer = null;
+  let toastTimer = null;
+  let confirmResolver = null;
+  let recoveredFromBackup = false;
+
+  /* ---------------- data ---------------- */
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function toNumber(value, fallback = 0) {
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function makeComponent(name, weight, count) {
+    const safeCount = clamp(Math.round(toNumber(count, 0)), 0, MAX_ITEMS);
+    const items = [];
+    for (let i = 0; i < safeCount; i += 1) {
+      items.push({ id: uid(), name: `${name} ${i + 1}`, score: 0 });
+    }
+    return {
+      id: uid(),
+      name,
+      weight: clamp(toNumber(weight, 0), 0, 100),
+      items
+    };
+  }
+
+  function makeCourse(name, components = []) {
+    return { id: uid(), name, components, target: null };
+  }
+
+  function normalizeTarget(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = typeof value === 'number' ? value : parseFloat(value);
+    if (!Number.isFinite(parsed)) return null;
+    return clamp(Math.round(parsed * 10) / 10, 0, 100);
+  }
+
+  function seedState() {
+    const course = makeCourse('我的课程', [
+      makeComponent('实验', 40, 3),
+      makeComponent('Quiz', 20, 2),
+      makeComponent('期末考试', 40, 1)
+    ]);
+    return {
+      version: 1,
+      activeCourseId: course.id,
+      courses: [course],
+      updatedAt: Date.now()
+    };
+  }
+
+  function normalizeState(raw) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.courses) || raw.courses.length === 0) {
+      return null;
+    }
+
+    const seenCourseIds = new Set();
+    const courses = raw.courses.map((course) => {
+      let courseId = typeof course.id === 'string' && course.id ? course.id : uid();
+      if (seenCourseIds.has(courseId)) courseId = uid();
+      seenCourseIds.add(courseId);
+
+      const components = Array.isArray(course.components) ? course.components.map((comp) => {
+        const name = String(comp.name || '未命名部分').slice(0, 24);
+        const seenItemIds = new Set();
+        const items = (Array.isArray(comp.items) ? comp.items : []).slice(0, MAX_ITEMS).map((item, index) => {
+          let itemId = typeof item.id === 'string' && item.id ? item.id : uid();
+          if (seenItemIds.has(itemId)) itemId = uid();
+          seenItemIds.add(itemId);
+          return {
+            id: itemId,
+            name: String(item.name || `${name} ${index + 1}`).slice(0, 30),
+            score: clamp(toNumber(item.score, 0), 0, 100)
+          };
+        });
+        return {
+          id: typeof comp.id === 'string' && comp.id ? comp.id : uid(),
+          name,
+          weight: clamp(toNumber(comp.weight, 0), 0, 100),
+          items
+        };
+      }) : [];
+
+      return {
+        id: courseId,
+        name: String(course.name || '未命名课程').slice(0, 40),
+        components,
+        target: normalizeTarget(course.target)
+      };
+    });
+
+    const activeCourseId = courses.some((course) => course.id === raw.activeCourseId)
+      ? raw.activeCourseId
+      : courses[0].id;
+
+    return {
+      version: 1,
+      activeCourseId,
+      courses,
+      updatedAt: toNumber(raw.updatedAt, Date.now())
+    };
+  }
+
+  function readStoredState(key) {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch (error) {
+      console.warn('读取本机数据失败：', error);
+      return null;
+    }
+    if (!raw) return null;
+
+    try {
+      const parsed = normalizeState(JSON.parse(raw));
+      return parsed ? { state: parsed, raw } : null;
+    } catch (error) {
+      console.warn('本机数据格式异常：', error);
+      return null;
+    }
+  }
+
+  function loadState() {
+    const saved = readStoredState(STORAGE_KEY);
+    if (saved) return saved.state;
+
+    const backup = readStoredState(BACKUP_KEY);
+    if (backup) {
+      recoveredFromBackup = true;
+      return backup.state;
+    }
+
+    const seeded = seedState();
+    try {
+      const serialized = JSON.stringify(seeded);
+      localStorage.setItem(STORAGE_KEY, serialized);
+      localStorage.setItem(BACKUP_KEY, serialized);
+    } catch (error) {
+      console.warn('写入本机数据失败：', error);
+    }
+    return seeded;
+  }
+
+  function activeCourse() {
+    return state.courses.find((course) => course.id === state.activeCourseId) || state.courses[0];
+  }
+
+  function findComponent(id) {
+    return activeCourse().components.find((comp) => comp.id === id);
+  }
+
+  function findItem(comp, id) {
+    return comp.items.find((item) => item.id === id);
+  }
+
+  function statsFor(course) {
+    let weight = 0;
+    let weighted = 0;
+    let itemCount = 0;
+    let top = null;
+
+    course.components.forEach((comp) => {
+      weight += toNumber(comp.weight, 0);
+      itemCount += comp.items.length;
+      if (comp.items.length === 0) return;
+
+      const sum = comp.items.reduce((acc, item) => acc + toNumber(item.score, 0), 0);
+      const avg = sum / comp.items.length;
+      const contribution = avg * toNumber(comp.weight, 0) / 100;
+      weighted += contribution;
+      if (!top || contribution > top.contribution) {
+        top = { name: comp.name, contribution, avg };
+      }
+    });
+
+    return {
+      total: itemCount > 0 ? weighted : null,
+      weight,
+      itemCount,
+      top
+    };
+  }
+
+  function averageOf(comp) {
+    if (!comp.items.length) return null;
+    return comp.items.reduce((acc, item) => acc + toNumber(item.score, 0), 0) / comp.items.length;
+  }
+
+  function formatScore(value) {
+    return value == null ? '—' : value.toFixed(1);
+  }
+
+  function formatWeight(value) {
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  }
+
+  function gradeOf(total) {
+    if (total == null) return { label: '待录入', tone: 'none' };
+    if (total >= 90) return { label: '优秀', tone: 'great' };
+    if (total >= 80) return { label: '良好', tone: 'good' };
+    if (total >= 70) return { label: '中等', tone: 'mid' };
+    if (total >= 50) return { label: '及格', tone: 'pass' };
+    return { label: '不及格', tone: 'fail' };
+  }
+
+  function hasAnyScore(course) {
+    return course.components.some((comp) => comp.items.some((item) => toNumber(item.score, 0) > 0));
+  }
+
+  /* ---------------- persistence ---------------- */
+
+  function timeLabel(date = new Date()) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+
+  function setSaveState(kind, text) {
+    els.saveState.dataset.state = kind;
+    els.saveText.textContent = text;
+  }
+
+  function flushSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    try {
+      const previousRaw = localStorage.getItem(STORAGE_KEY);
+      if (previousRaw) {
+        try {
+          JSON.parse(previousRaw);
+          localStorage.setItem(BACKUP_KEY, previousRaw);
+        } catch (backupError) {
+          console.warn('自动备份失败：', backupError);
+        }
+      }
+      state.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      setSaveState('saved', `已保存 ${timeLabel()}`);
+      return true;
+    } catch (error) {
+      console.error('保存失败：', error);
+      setSaveState('error', '保存失败');
+      showToast('无法写入本机存储，请用「导出」备份成绩');
+      return false;
+    }
+  }
+
+  function scheduleSave() {
+    setSaveState('saving', '保存中…');
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSave, 220);
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function renderAll() {
+    const course = activeCourse();
+    if (!course) return;
+
+    els.courseName.value = course.name;
+    els.heroCourseName.textContent = course.name || '未命名课程';
+    renderCourseList();
+    renderComponents();
+    refreshLive();
+  }
+
+  function renderCourseList() {
+    els.courseList.innerHTML = state.courses.map((course, index) => {
+      const stats = statsFor(course);
+      const tone = TONES[index % TONES.length];
+      const initial = (course.name || '课').trim().charAt(0) || '课';
+      const active = course.id === state.activeCourseId;
+      return `
+        <button class="course-item${active ? ' active' : ''}" type="button" data-course="${course.id}"${active ? ' aria-current="page"' : ''}>
+          <span class="course-avatar" style="--tone:${tone}">${escapeHtml(initial)}</span>
+          <span class="course-info">
+            <span class="course-name">${escapeHtml(course.name || '未命名课程')}</span>
+            <span class="course-sub">${course.components.length} 部分 · ${stats.itemCount} 次记录</span>
+          </span>
+          <span class="course-score" data-course-score="${course.id}">${formatScore(stats.total)}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function renderComponents() {
+    const course = activeCourse();
+    const components = course.components;
+    els.componentCount.textContent = `${components.length} 部分`;
+
+    if (components.length === 0) {
+      els.componentList.innerHTML = `
+        <div class="empty-components">
+          <div class="empty-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <h3>这门课还没有组成部分</h3>
+          <p>比如「实验 40%」「Quiz 20%」「期末考试 40%」。添加之后，就能记录每一次的成绩了。</p>
+          <button class="btn btn-accent" type="button" data-empty-add>
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            添加第一个组成部分
+          </button>
+          <div class="preset-row">
+            <span>或使用模板：</span>
+            <button class="preset-btn" type="button" data-preset="lab">实验课</button>
+            <button class="preset-btn" type="button" data-preset="standard">平时 + 期末</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    els.componentList.innerHTML = components.map((comp, index) => componentCard(comp, index)).join('');
+  }
+
+  function componentCard(comp, index) {
+    const tone = TONES[index % TONES.length];
+    const avg = averageOf(comp);
+    const contribution = avg == null ? 0 : avg * toNumber(comp.weight, 0) / 100;
+    const rows = comp.items.length
+      ? comp.items.map((item) => itemRow(item, comp.name)).join('')
+      : '<div class="no-items">还没有记录项，点下面的「+」添加一次实验或 quiz。</div>';
+
+    return `
+      <article class="component-card" data-comp="${comp.id}" style="--tone:${tone}; animation-delay:${Math.min(index * 35, 180)}ms">
+        <header class="comp-top">
+          <span class="comp-index">${String(index + 1).padStart(2, '0')}</span>
+          <input class="comp-name" data-field="comp-name" value="${escapeHtml(comp.name)}" maxlength="24" aria-label="组成部分名称" spellcheck="false">
+          <label class="weight-field" title="该部分占总成绩的百分比">
+            <input type="number" data-field="weight" value="${formatWeight(comp.weight)}" min="0" max="100" step="1" aria-label="${escapeHtml(comp.name)} 权重百分比" inputmode="decimal">
+            <span>%</span>
+          </label>
+          <button class="comp-del" type="button" data-act="del-comp" title="删除这个组成部分" aria-label="删除 ${escapeHtml(comp.name)}">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+          </button>
+        </header>
+        <div class="comp-stats">
+          <span>平均 <b data-comp-avg>${formatScore(avg)}</b></span>
+          <span class="sep">·</span>
+          <span class="contrib">贡献 <b data-comp-contrib>${contribution.toFixed(1)}</b> 分</span>
+          <span class="sep">·</span>
+          <span><b data-comp-count>${comp.items.length}</b> 次</span>
+        </div>
+        <div class="items">${rows}</div>
+        <footer class="comp-foot">
+          <div class="count-control">
+            <span>次数</span>
+            <button class="count-btn" type="button" data-act="dec" title="减少一次" aria-label="减少一次">
+              <svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg>
+            </button>
+            <b class="count-value">${comp.items.length}</b>
+            <button class="count-btn" type="button" data-act="inc" title="增加一次" aria-label="增加一次">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+            </button>
+          </div>
+          <button class="text-btn" type="button" data-act="clear">清空成绩</button>
+        </footer>
+      </article>
+    `;
+  }
+
+  function itemRow(item, compName) {
+    const score = clamp(toNumber(item.score, 0), 0, 100);
+    return `
+      <div class="item-row" data-item="${item.id}" style="--val:${score}%">
+        <div class="item-head">
+          <input class="item-name" data-field="item-name" value="${escapeHtml(item.name)}" maxlength="30" aria-label="${escapeHtml(compName)} 记录名称" spellcheck="false">
+          <div class="score-num">
+            <input type="number" data-field="score-num" value="${score}" min="0" max="100" step="1" aria-label="${escapeHtml(item.name)} 成绩" inputmode="numeric">
+            <span>分</span>
+          </div>
+        </div>
+        <input class="slider" type="range" data-field="score" min="0" max="100" step="1" value="${score}" aria-label="${escapeHtml(item.name)} 成绩滑块">
+      </div>
+    `;
+  }
+
+  function refreshLive() {
+    const course = activeCourse();
+    if (!course) return;
+    const stats = statsFor(course);
+    renderHero(course, stats);
+    renderWeightWarning(stats);
+    updateCourseScores();
+    updateComponentStats();
+  }
+
+  function renderHero(course, stats) {
+    const total = stats.total;
+    const grade = gradeOf(total);
+    const anyScore = hasAnyScore(course);
+
+    els.totalScore.textContent = formatScore(total);
+    els.scoreRing.style.setProperty('--p', clamp(total == null ? 0 : total, 0, 100));
+    els.scoreRing.dataset.tone = grade.tone;
+    els.gradeBadge.textContent = anyScore ? grade.label : '待录入';
+    els.gradeBadge.dataset.tone = anyScore ? grade.tone : 'none';
+    els.statItems.textContent = `${stats.itemCount}`;
+    els.statWeight.textContent = `${formatWeight(stats.weight)}%`;
+    els.statTop.textContent = stats.top && stats.top.contribution > 0 ? stats.top.name : '—';
+    els.statTop.title = stats.top && stats.top.contribution > 0 ? stats.top.name : '';
+
+    renderGoal(course, total, anyScore);
+
+    if (course.components.length === 0) {
+      els.heroTitle.textContent = '先搭好课程结构。';
+      els.heroHint.textContent = '添加组成部分、设置权重和次数，再开始记录每一次成绩。';
+    } else if (stats.itemCount === 0) {
+      els.heroTitle.textContent = '给每个部分加上次数。';
+      els.heroHint.textContent = '点组成部分下方的「+」，添加实验或 quiz 的次数。';
+    } else if (!anyScore) {
+      els.heroTitle.textContent = '还在等待第一笔成绩。';
+      els.heroHint.textContent = '拖动下方滑块记录成绩，所有改动都会自动保存在本机。';
+    } else if (total != null && total >= 90) {
+      els.heroTitle.textContent = '漂亮，已经进入优秀区间。';
+      els.heroHint.textContent = '继续保持这个节奏，别忘了把后续的实验和 quiz 也记进来。';
+    } else if (total != null && total >= 80) {
+      els.heroTitle.textContent = '状态不错，稳稳往前走。';
+      els.heroHint.textContent = '每一笔成绩都已保存，继续记录就能看到更准确的加权总分。';
+    } else if (total != null && total >= 50) {
+      els.heroTitle.textContent = '已经过线，继续往上。';
+      els.heroHint.textContent = '及格线是 50 分。权重高的部分优先投入，后面的成绩会更有分量。';
+    } else {
+      els.heroTitle.textContent = '别急，现在只是起点。';
+      els.heroHint.textContent = '及格线是 50 分，调整后面的实验和 quiz，加权总分就会跟着变化。';
+    }
+  }
+
+  function renderGoal(course, total, anyScore) {
+    const target = normalizeTarget(course.target);
+
+    if (target == null) {
+      els.goalValue.textContent = '未设定';
+      els.goalValue.classList.add('unset');
+      els.goalStatus.textContent = '设一个目标，看看离它还有多远。';
+      els.goalBtn.textContent = '设定目标';
+      els.goalTrack.hidden = true;
+      els.ringTarget.classList.remove('show');
+      els.heroGoal.classList.remove('achieved');
+      return;
+    }
+
+    const achieved = total != null && total >= target;
+    els.goalValue.textContent = `${formatWeight(target)} 分`;
+    els.goalValue.classList.remove('unset');
+    els.goalBtn.textContent = '调整';
+    els.goalTrack.hidden = false;
+    els.ringTarget.classList.add('show');
+    els.ringTarget.style.setProperty('--target', clamp(target, 0, 100));
+    els.goalMark.style.left = `${clamp(target, 0, 100)}%`;
+    els.goalFill.style.width = `${clamp(total == null ? 0 : total, 0, 100)}%`;
+    els.heroGoal.classList.toggle('achieved', achieved);
+
+    if (total == null || !anyScore) {
+      els.goalStatus.textContent = '记录第一笔成绩后，开始追踪目标进度。';
+    } else if (achieved) {
+      const over = total - target;
+      els.goalStatus.textContent = over < 0.05
+        ? '已经达到目标。'
+        : `已经达到目标，高出 ${over.toFixed(1)} 分。`;
+    } else {
+      els.goalStatus.textContent = `距离目标还差 ${(target - total).toFixed(1)} 分。`;
+    }
+  }
+
+  function renderWeightWarning(stats) {
+    if (!activeCourse().components.length) {
+      els.weightWarning.classList.remove('show');
+      return;
+    }
+
+    const diff = Math.round((100 - stats.weight) * 10) / 10;
+    if (Math.abs(diff) < 0.05) {
+      els.weightWarning.classList.remove('show');
+      return;
+    }
+
+    els.weightWarning.classList.add('show');
+    els.weightWarningText.innerHTML = diff > 0
+      ? `权重合计为 <b>${formatWeight(stats.weight)}%</b>，还差 <b>${formatWeight(diff)}%</b> 到 100%。总分按实际权重计算。`
+      : `权重合计为 <b>${formatWeight(stats.weight)}%</b>，超出 <b>${formatWeight(-diff)}%</b>。建议调整到刚好 100%。`;
+  }
+
+  function updateCourseScores() {
+    state.courses.forEach((course) => {
+      const el = els.courseList.querySelector(`[data-course-score="${course.id}"]`);
+      if (el) el.textContent = formatScore(statsFor(course).total);
+    });
+  }
+
+  function updateComponentStats() {
+    const course = activeCourse();
+    course.components.forEach((comp) => {
+      const card = els.componentList.querySelector(`[data-comp="${comp.id}"]`);
+      if (!card) return;
+      const avg = averageOf(comp);
+      const contribution = avg == null ? 0 : avg * toNumber(comp.weight, 0) / 100;
+      const avgEl = $('[data-comp-avg]', card);
+      const contribEl = $('[data-comp-contrib]', card);
+      const countEl = $('[data-comp-count]', card);
+      if (avgEl) avgEl.textContent = formatScore(avg);
+      if (contribEl) contribEl.textContent = contribution.toFixed(1);
+      if (countEl) countEl.textContent = String(comp.items.length);
+    });
+  }
+
+  /* ---------------- actions ---------------- */
+
+  function applyScore(comp, itemId, value, source) {
+    const item = findItem(comp, itemId);
+    if (!item) return;
+    const score = clamp(Math.round(toNumber(value, 0)), 0, 100);
+    item.score = score;
+
+    const row = els.componentList.querySelector(`[data-item="${itemId}"]`);
+    if (row) {
+      const range = $('[data-field="score"]', row);
+      const num = $('[data-field="score-num"]', row);
+      if (range) {
+        if (source !== 'range') range.value = String(score);
+        range.style.setProperty('--val', `${score}%`);
+      }
+      if (num && source !== 'number') num.value = String(score);
+    }
+
+    refreshLive();
+    scheduleSave();
+  }
+
+  function addItem(comp) {
+    if (comp.items.length >= MAX_ITEMS) {
+      showToast(`每个部分最多记录 ${MAX_ITEMS} 次`);
+      return;
+    }
+    const index = comp.items.length + 1;
+    comp.items.push({
+      id: uid(),
+      name: `${comp.name || '记录'} ${index}`,
+      score: 0
+    });
+    renderAll();
+    scheduleSave();
+    showToast(`已添加「${comp.name} ${index}」`);
+  }
+
+  async function removeItem(comp) {
+    if (comp.items.length === 0) return;
+    const last = comp.items[comp.items.length - 1];
+    if (toNumber(last.score, 0) > 0) {
+      const ok = await askConfirm({
+        title: '减少一次记录？',
+        message: `「${last.name}」已经记录了 ${last.score} 分，减少次数会把这条成绩一起删除。`,
+        confirmText: '删除这条成绩'
+      });
+      if (!ok) return;
+    }
+    comp.items.pop();
+    renderAll();
+    scheduleSave();
+    showToast('已减少一次记录');
+  }
+
+  async function clearComponent(comp) {
+    if (!comp.items.some((item) => toNumber(item.score, 0) > 0)) {
+      showToast('这个部分还没有需要清除的成绩');
+      return;
+    }
+    const ok = await askConfirm({
+      title: `清空「${comp.name}」的成绩？`,
+      message: '这个部分里的所有分数会归零，课程结构和次数会保留。',
+      confirmText: '清空成绩'
+    });
+    if (!ok) return;
+    comp.items.forEach((item) => { item.score = 0; });
+    renderAll();
+    scheduleSave();
+    showToast('成绩已清空');
+  }
+
+  async function deleteComponent(comp) {
+    const ok = await askConfirm({
+      title: `删除「${comp.name}」？`,
+      message: '这个组成部分的权重和所有成绩都会被删除，且无法恢复。',
+      confirmText: '删除组成部分'
+    });
+    if (!ok) return;
+    const course = activeCourse();
+    course.components = course.components.filter((item) => item.id !== comp.id);
+    renderAll();
+    scheduleSave();
+    showToast('组成部分已删除');
+  }
+
+  async function deleteCourse() {
+    if (state.courses.length <= 1) {
+      showToast('至少保留一门课程');
+      return;
+    }
+    const course = activeCourse();
+    const ok = await askConfirm({
+      title: `删除「${course.name}」？`,
+      message: '这门课的所有组成部分和成绩都会被删除，且无法恢复。',
+      confirmText: '删除课程'
+    });
+    if (!ok) return;
+
+    state.courses = state.courses.filter((item) => item.id !== course.id);
+    state.activeCourseId = state.courses[0].id;
+    renderAll();
+    flushSave();
+    showToast('课程已删除');
+  }
+
+  function applyPreset(kind) {
+    const course = activeCourse();
+    if (course.components.length > 0) return;
+    if (kind === 'lab') {
+      course.components = [
+        makeComponent('实验', 40, 5),
+        makeComponent('Quiz', 20, 3),
+        makeComponent('期末考试', 40, 1)
+      ];
+    } else {
+      course.components = [
+        makeComponent('平时成绩', 30, 3),
+        makeComponent('期中考试', 20, 1),
+        makeComponent('期末考试', 50, 1)
+      ];
+    }
+    renderAll();
+    scheduleSave();
+    showToast('模板已套用，可以继续修改');
+  }
+
+  function openComponentDialog() {
+    const course = activeCourse();
+    const weight = Math.round((100 - statsFor(course).weight) * 10) / 10;
+    els.componentForm.reset();
+    els.compName.value = '';
+    els.compWeight.value = weight > 0 ? String(weight) : '20';
+    els.compCount.value = '1';
+    els.componentDialog.showModal();
+    setTimeout(() => els.compName.focus(), 60);
+  }
+
+  function openTargetDialog() {
+    const course = activeCourse();
+    els.targetForm.reset();
+    els.targetScore.value = course.target == null ? '' : String(formatWeight(course.target));
+    els.clearTargetBtn.hidden = course.target == null;
+    els.targetDialog.showModal();
+    setTimeout(() => {
+      els.targetScore.focus();
+      els.targetScore.select();
+    }, 60);
+  }
+
+  function saveTarget() {
+    const raw = els.targetScore.value.trim();
+    if (raw === '') {
+      els.targetScore.focus();
+      return;
+    }
+    const course = activeCourse();
+    course.target = clamp(Math.round(toNumber(raw, 0)), 0, 100);
+    els.targetDialog.close();
+    refreshLive();
+    flushSave();
+    showToast(`目标已设为 ${formatWeight(course.target)} 分`);
+  }
+
+  function clearTarget() {
+    const course = activeCourse();
+    if (course.target == null) {
+      els.targetDialog.close();
+      return;
+    }
+    course.target = null;
+    els.targetDialog.close();
+    refreshLive();
+    flushSave();
+    showToast('已清除目标成绩');
+  }
+
+  async function restoreBackup() {
+    let backupState = null;
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (raw) backupState = normalizeState(JSON.parse(raw));
+    } catch (error) {
+      console.warn('读取自动备份失败：', error);
+    }
+
+    if (!backupState) {
+      showToast('还没有可恢复的自动备份');
+      return;
+    }
+
+    const ok = await askConfirm({
+      title: '恢复上次自动备份？',
+      message: '当前课程和成绩会被上一次自动备份覆盖。如果只是担心丢失，建议先点「导出」保存一份。',
+      confirmText: '恢复备份'
+    });
+    if (!ok) return;
+
+    state = backupState;
+    renderAll();
+    flushSave();
+    showToast('已恢复上次自动备份');
+  }
+
+  function openCourseDialog() {
+    els.courseForm.reset();
+    els.newCourseName.value = '';
+    els.courseDialog.showModal();
+    setTimeout(() => els.newCourseName.focus(), 60);
+  }
+
+  function showToast(message) {
+    els.toast.textContent = message;
+    els.toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2400);
+  }
+
+  function askConfirm({ title, message, confirmText = '确定删除', danger = true }) {
+    if (confirmResolver) {
+      confirmResolver(false);
+      confirmResolver = null;
+    }
+    return new Promise((resolve) => {
+      confirmResolver = resolve;
+      els.confirmTitle.textContent = title;
+      els.confirmMessage.textContent = message;
+      els.confirmOk.textContent = confirmText;
+      els.confirmOk.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+      els.confirmDialog.returnValue = '';
+      els.confirmDialog.showModal();
+    });
+  }
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date();
+    const stamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    link.href = url;
+    link.download = `成绩本备份-${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+    showToast('备份文件已导出');
+  }
+
+  /* ---------------- events ---------------- */
+
+  els.courseList.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-course]');
+    if (!item) return;
+    const id = item.dataset.course;
+    if (id === state.activeCourseId) return;
+    state.activeCourseId = id;
+    renderAll();
+    scheduleSave();
+  });
+
+  els.courseName.addEventListener('input', () => {
+    const course = activeCourse();
+    course.name = els.courseName.value.slice(0, 40);
+    const display = course.name || '未命名课程';
+    const listItem = els.courseList.querySelector(`[data-course="${course.id}"]`);
+    if (listItem) {
+      const nameEl = $('.course-name', listItem);
+      if (nameEl) nameEl.textContent = display;
+    }
+    els.heroCourseName.textContent = display;
+    scheduleSave();
+  });
+
+  els.courseName.addEventListener('blur', () => {
+    const course = activeCourse();
+    if (!course.name.trim()) {
+      course.name = '未命名课程';
+      els.courseName.value = course.name;
+      const listItem = els.courseList.querySelector(`[data-course="${course.id}"]`);
+      if (listItem) {
+        const nameEl = $('.course-name', listItem);
+        if (nameEl) nameEl.textContent = course.name;
+      }
+      els.heroCourseName.textContent = course.name;
+      scheduleSave();
+    }
+  });
+
+  els.newCourseBtn.addEventListener('click', openCourseDialog);
+  els.addComponentBtn.addEventListener('click', openComponentDialog);
+  els.goalBtn.addEventListener('click', openTargetDialog);
+  els.restoreBackupBtn.addEventListener('click', restoreBackup);
+
+  els.targetForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveTarget();
+  });
+
+  els.clearTargetBtn.addEventListener('click', clearTarget);
+
+  els.targetDialog.addEventListener('click', (event) => {
+    const preset = event.target.closest('[data-target-preset]');
+    if (!preset) return;
+    els.targetScore.value = preset.dataset.targetPreset;
+    els.targetScore.focus();
+  });
+
+  els.courseForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = els.newCourseName.value.trim() || '未命名课程';
+    const course = makeCourse(name, []);
+    state.courses.push(course);
+    state.activeCourseId = course.id;
+    els.courseDialog.close();
+    renderAll();
+    flushSave();
+    showToast(`已创建「${name}」`);
+    setTimeout(() => els.courseName.select(), 120);
+  });
+
+  els.componentForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = els.compName.value.trim() || '新组成部分';
+    const weight = clamp(toNumber(els.compWeight.value, 0), 0, 100);
+    const count = clamp(Math.round(toNumber(els.compCount.value, 0)), 0, MAX_ITEMS);
+    activeCourse().components.push(makeComponent(name, weight, count));
+    els.componentDialog.close();
+    renderAll();
+    flushSave();
+    showToast(`已添加「${name}」`);
+  });
+
+  els.componentList.addEventListener('input', (event) => {
+    const target = event.target;
+    const card = target.closest('[data-comp]');
+    if (!card) return;
+    const comp = findComponent(card.dataset.comp);
+    if (!comp) return;
+
+    if (target.matches('[data-field="comp-name"]')) {
+      comp.name = target.value.slice(0, 24);
+      scheduleSave();
+      refreshLive();
+      return;
+    }
+
+    if (target.matches('[data-field="weight"]')) {
+      const value = parseFloat(target.value);
+      if (Number.isFinite(value) && value >= 0 && value <= 100) {
+        comp.weight = value;
+        refreshLive();
+        scheduleSave();
+      }
+      return;
+    }
+
+    if (target.matches('[data-field="item-name"]')) {
+      const row = target.closest('[data-item]');
+      const item = row ? findItem(comp, row.dataset.item) : null;
+      if (item) {
+        item.name = target.value.slice(0, 30);
+        scheduleSave();
+      }
+      return;
+    }
+
+    if (target.matches('[data-field="score"]')) {
+      const row = target.closest('[data-item]');
+      if (row) applyScore(comp, row.dataset.item, target.value, 'range');
+      return;
+    }
+
+    if (target.matches('[data-field="score-num"]')) {
+      const row = target.closest('[data-item]');
+      const value = parseFloat(target.value);
+      if (row && Number.isFinite(value) && value >= 0 && value <= 100) {
+        applyScore(comp, row.dataset.item, value, 'number');
+      }
+    }
+  });
+
+  els.componentList.addEventListener('change', (event) => {
+    const target = event.target;
+    const card = target.closest('[data-comp]');
+    if (!card) return;
+    const comp = findComponent(card.dataset.comp);
+    if (!comp) return;
+
+    if (target.matches('[data-field="weight"]')) {
+      const value = clamp(toNumber(target.value, 0), 0, 100);
+      comp.weight = value;
+      target.value = formatWeight(value);
+      refreshLive();
+      scheduleSave();
+      return;
+    }
+
+    if (target.matches('[data-field="score-num"]')) {
+      const row = target.closest('[data-item]');
+      if (!row) return;
+      const value = clamp(toNumber(target.value, 0), 0, 100);
+      target.value = String(value);
+      applyScore(comp, row.dataset.item, value, 'number');
+    }
+  });
+
+  els.componentList.addEventListener('click', (event) => {
+    const emptyAdd = event.target.closest('[data-empty-add]');
+    if (emptyAdd) {
+      openComponentDialog();
+      return;
+    }
+
+    const preset = event.target.closest('[data-preset]');
+    if (preset) {
+      applyPreset(preset.dataset.preset);
+      return;
+    }
+
+    const button = event.target.closest('button[data-act]');
+    if (!button) return;
+    const card = button.closest('[data-comp]');
+    if (!card) return;
+    const comp = findComponent(card.dataset.comp);
+    if (!comp) return;
+
+    const action = button.dataset.act;
+    if (action === 'inc') addItem(comp);
+    if (action === 'dec') removeItem(comp);
+    if (action === 'clear') clearComponent(comp);
+    if (action === 'del-comp') deleteComponent(comp);
+  });
+
+  els.deleteCourseBtn.addEventListener('click', deleteCourse);
+  els.exportBtn.addEventListener('click', exportData);
+  els.importBtn.addEventListener('click', () => els.importFile.click());
+
+  els.importFile.addEventListener('change', async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = normalizeState(JSON.parse(text));
+      if (!imported) throw new Error('invalid');
+
+      const ok = await askConfirm({
+        title: '导入这份备份？',
+        message: '导入后，当前所有课程和成绩会被备份里的内容覆盖。',
+        confirmText: '导入并覆盖'
+      });
+      if (!ok) return;
+
+      state = imported;
+      renderAll();
+      flushSave();
+      showToast('备份导入成功');
+    } catch (error) {
+      console.warn('导入失败：', error);
+      showToast('导入失败：文件格式不正确');
+    } finally {
+      event.target.value = '';
+    }
+  });
+
+  els.confirmOk.addEventListener('click', () => {
+    els.confirmDialog.close('ok');
+  });
+
+  els.confirmCancel.addEventListener('click', () => {
+    els.confirmDialog.close('cancel');
+  });
+
+  els.confirmDialog.addEventListener('close', () => {
+    if (!confirmResolver) return;
+    const resolver = confirmResolver;
+    confirmResolver = null;
+    resolver(els.confirmDialog.returnValue === 'ok');
+  });
+
+  document.addEventListener('click', (event) => {
+    const closer = event.target.closest('[data-close]');
+    if (closer) {
+      const dialog = closer.closest('dialog');
+      if (dialog) dialog.close('cancel');
+    }
+  });
+
+  [els.courseDialog, els.componentDialog, els.targetDialog, els.confirmDialog].forEach((dialog) => {
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close('cancel');
+    });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      if (flushSave()) showToast('已保存');
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saveTimer) flushSave();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (saveTimer) flushSave();
+  });
+
+  /* ---------------- boot ---------------- */
+
+  state = loadState();
+  renderAll();
+
+  if (recoveredFromBackup) {
+    try {
+      state.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn('修复本机数据失败：', error);
+    }
+    showToast('已从自动备份恢复上次数据');
+  }
+
+  if (state.updatedAt) {
+    setSaveState('saved', `已保存 ${timeLabel(new Date(state.updatedAt))}`);
+  } else {
+    setSaveState('saved', '自动保存已开启');
+  }
+})();
+</script>
+</body>
+</html>

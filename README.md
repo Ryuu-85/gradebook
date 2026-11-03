@@ -33,4 +33,3 @@ Gradebook is a local browser-based grade calculator for managing multiple course
 Download the project and open `index.html` in a modern browser. No installation or server is required. Edit the course name, add components, set their weights and enter scores. The passing threshold is 50 points.
 
 Your grades are stored in the current browser on your device, not in the project folder. Export a JSON backup before clearing browser data, switching browsers or moving to another computer; use Import to restore it.
-
